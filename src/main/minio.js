@@ -121,8 +121,6 @@ export class Client {
     this.host = host
     this.port = port
     this.protocol = protocol
-    this.accessKey = params.accessKey
-    this.secretKey = params.secretKey
     this.sessionToken = params.sessionToken
     this.userAgent = `${libraryAgent}`
 
@@ -133,8 +131,22 @@ export class Client {
       this.pathStyle = params.pathStyle
     }
 
-    if (!this.accessKey) this.accessKey = ''
-    if (!this.secretKey) this.secretKey = ''
+    // fallback to env credentials, or empty if needed
+    const envCredKeys = {
+      accessKey: 'MINIO_ACCESS_KEY',
+      secretKey: 'MINIO_SECRET_KEY',
+    };
+    Object.keys(envCredKeys).forEach( (key) =>
+    {
+      const envKey = scanEnv[key];
+      if ( typeof params[key] == 'string' )
+        this[key] = params[key];
+      else if ( typeof process == 'object' && process.env[envKey] )
+        this[key] = process.env[envKey];
+      else this[key] = '';
+    });
+
+    // anonymous
     this.anonymous = !this.accessKey || !this.secretKey
 
     this.regionMap = {}
