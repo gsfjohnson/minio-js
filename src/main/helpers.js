@@ -16,6 +16,9 @@
 
 import stream from 'stream'
 import mime from 'mime-types'
+var Crypto = require('crypto-browserify')
+const ipaddr = require('ipaddr.js')
+import { isBrowser } from "browser-or-node"
 
 // Returns a wrapper function that will promisify a given callback function.
 // It will preserve 'this'.
@@ -101,19 +104,14 @@ export function isVirtualHostStyle(endpoint, protocol, bucket, pathStyle) {
   return isAmazonEndpoint(endpoint) || !pathStyle
 }
 
-var ipv4Regex = /^(\d{1,3}\.){3,3}\d{1,3}$/
 
 export function isValidIP(ip) {
-  return ipv4Regex.test(ip)
+  return ipaddr.isValid(ip)
 }
 
 // isValidEndpoint - true if endpoint is valid domain.
 export function isValidEndpoint(endpoint) {
-  if (!isValidDomain(endpoint) && !isValidIP(endpoint)) {
-    return false
-  }
-  // Return true.
-  return true
+  return isValidDomain(endpoint) || isValidIP(endpoint)
 }
 
 // isValidDomain - true if input host is a valid domain.
@@ -328,7 +326,7 @@ export function isAmzHeader(key) {
   var temp = key.toLowerCase()
   return temp.startsWith("x-amz-meta-") || temp === "x-amz-acl" || temp.startsWith("x-amz-server-side-encryption-") || temp === "x-amz-server-side-encryption"
 }
-//Checks if it is a supported Header
+// Checks if it is a supported Header
 export function isSupportedHeader(key) {
   var supported_headers = [
     'content-type',
@@ -339,7 +337,7 @@ export function isSupportedHeader(key) {
     'x-amz-website-redirect-location']
   return (supported_headers.indexOf(key.toLowerCase()) > -1)
 }
-//Checks if it is a storage header
+// Checks if it is a storage header
 export function isStorageclassHeader(key) {
   return key.toLowerCase() === "x-amz-storage-class"
 }
@@ -383,4 +381,38 @@ export const RETENTION_VALIDITY_UNITS={
 export const LEGAL_HOLD_STATUS={
   ENABLED:"ON",
   DISABLED:"OFF"
+}
+
+const objectToBuffer = (payload) =>{
+  const payloadBuf = Buffer.from(Buffer.from(payload))
+  return payloadBuf
+}
+
+export const toMd5=(payload)=>{
+  let payLoadBuf = objectToBuffer(payload)
+  // use string from browser and buffer from nodejs
+  // browser support is tested only against minio server
+  payLoadBuf = isBrowser ? payLoadBuf.toString() : payLoadBuf
+  return Crypto.createHash('md5').update(payLoadBuf).digest().toString('base64')
+}
+
+export const toSha256=(payload)=>{
+  return Crypto.createHash('sha256').update(payload).digest('hex')
+}
+
+// toArray returns a single element array with param being the element,
+// if param is just a string, and returns 'param' back if it is an array
+// So, it makes sure param is always an array
+export const toArray = (param) => {
+  if (!Array.isArray(param)) {
+    return Array(param)
+  }
+  return param
+}
+
+export const sanitizeObjectKey=(objectName)=>{
+  // + symbol characters are not decoded as spaces in JS. so replace them first and decode to get the correct result.
+  let asStrName= (objectName || "").replace(/\+/g, ' ')
+  const sanitizedName = decodeURIComponent(asStrName)
+  return sanitizedName
 }
